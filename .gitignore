@@ -160,4 +160,10 @@ cython_debug/
 #.idea/
 
 data/*
+!data/*.md
+
 training_results/*
+!training_results/*.md
+
+models/*
+!models/*.md
