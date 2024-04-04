@@ -8,7 +8,7 @@ class TVLoss(nn.Module):
         self.tv_loss_weight = tv_loss_weight
 
     def forward(self, x):
-        batch_size, h_x, w_x = x.size()
+        batch_size, c_x, h_x, w_x = x.size()
         count_h = self.tensor_size(x[:, :, 1:, :])
         count_w = self.tensor_size(x[:, :, :, 1:])
         h_tv = torch.pow((x[:, :, 1:, :] - x[:, :, :h_x - 1, :]), 2).sum()
@@ -17,7 +17,7 @@ class TVLoss(nn.Module):
 
     @staticmethod
     def tensor_size(t):
-        return t.size()[1:4]
+        return t.size()[1] * t.size()[2] * t.size()[3]
 
 class GeneratorLoss(nn.Module):
     def __init__(self):

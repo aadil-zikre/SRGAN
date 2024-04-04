@@ -9,7 +9,7 @@ import torchvision.utils as utils
 # package imports no alias
 import torch
 import os
-import pytorch_ssim
+# import pytorch_ssim
 import math
 
 # Class/Fuction Imports
@@ -54,8 +54,6 @@ if __name__ == '__main__':
     #     print("generator criterion sent to cuda")
 
     if torch.cuda.is_available():
-        netG = nn.DataParallel(netG)
-        netD = nn.DataParallel(netD)
         netG.to(device)
         print("netG sent to cuda")
         netD.to(device)
@@ -103,14 +101,14 @@ if __name__ == '__main__':
             ###########################
             netG.zero_grad()
             ## The two lines below are added to prevent runetime error in Google Colab ##
-            # fake_img = netG(z)
-            # fake_out = netD(fake_img).mean()
+            fake_img = netG(z)
+            fake_out = netD(fake_img).mean()
             ##
             g_loss = generator_criterion(fake_out, fake_img, real_img)
             g_loss.backward()
 
-            # fake_img = netG(z)
-            # fake_out = netD(fake_img).mean()
+            fake_img = netG(z)
+            fake_out = netD(fake_img).mean()
 
             optimizerG.step()
 
@@ -147,13 +145,13 @@ if __name__ == '__main__':
 
                 batch_mse = ((sr - hr) ** 2).data.mean()
                 validation_results['mse'] += batch_mse * batch_size
-                batch_ssim = pytorch_ssim.ssim(sr, hr).item()
-                validation_results['ssims'] += batch_ssim * batch_size
+                # batch_ssim = pytorch_ssim.ssim(sr, hr).item()
+                # validation_results['ssims'] += batch_ssim * batch_size
                 validation_results['psnr'] = 10 * math.log10((hr.max()**2) / (validation_results['mse'] / validation_results['batch_sizes']))
-                validation_results['ssim'] = validation_results['ssims'] / validation_results['batch_sizes']
+                # validation_results['ssim'] = validation_results['ssims'] / validation_results['batch_sizes']
                 val_bar.set_description(
                     desc='[converting LR images to SR images] PSNR: %.4f dB SSIM: %.4f' % (
-                        validation_results['psnr'], validation_results['ssim']))
+                        validation_results['psnr'], 0))
 
                 val_images.extend(
                     [display_transform()(lr.squeeze(0)), display_transform()(hr.data.cpu().squeeze(0)),
@@ -176,12 +174,12 @@ if __name__ == '__main__':
         results['d_score'].append(running_results['d_score'] / running_results['batch_sizes'])
         results['g_score'].append(running_results['g_score'] / running_results['batch_sizes'])
         results['psnr'].append(validation_results['psnr'])
-        results['ssim'].append(validation_results['ssim'])
+        # results['ssim'].append(validation_results['ssim'])
 
         if epoch % 10 == 0 and epoch != 0:
             out_path = 'statistics/'
             data_frame = pd.DataFrame(
                 data={'Loss_D': results['d_loss'], 'Loss_G': results['g_loss'], 'Score_D': results['d_score'],
-                        'Score_G': results['g_score'], 'PSNR': results['psnr'], 'SSIM': results['ssim']},
+                        'Score_G': results['g_score'], 'PSNR': results['psnr'], 'SSIM': 0},
                 index=range(1, epoch + 1))
             data_frame.to_csv(out_path + 'srf_' + str(4) + '_train_results.csv', index_label='Epoch')
