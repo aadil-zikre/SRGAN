@@ -1,3 +1,4 @@
+## train copy.py
 # aliased imports
 import pandas as pd
 import numpy as np
@@ -27,10 +28,10 @@ from data_utils import Div2kValDataset, Div2kTrainDataset, display_transform
 import warnings
 warnings.filterwarnings("ignore")
 
-train_hr_loc = 'data/DIV2K_train_HR'
-train_lr_loc = 'data/DIV2K_train_LR_difficult'
-valid_hr_loc = 'data/DIV2K_valid_HR'
-valid_lr_loc = 'data/DIV2K_valid_LR_difficult'
+train_hr_loc = "/kaggle/input/div2k-data/DIV2K_train_HR/DIV2K_train_HR"
+train_lr_loc = "/kaggle/input/div2k-data/DIV2K_train_LR_difficult/DIV2K_train_LR_difficult"
+valid_hr_loc = "/kaggle/input/div2k-data/DIV2K_valid_HR/DIV2K_valid_HR"
+valid_lr_loc = "/kaggle/input/div2k-data/DIV2K_valid_LR_difficult/DIV2K_valid_LR_difficult"
 
 if __name__ == '__main__':
 
@@ -49,14 +50,23 @@ if __name__ == '__main__':
 
     generator_criterion = GeneratorLoss()
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device_gen = torch.device("cuda:0")
+    device_disc = torch.device("cuda:1")
+    # if torch.cuda.is_available():
+    #     netG.to(device)
+    #     print("netG sent to cuda")
+    #     netD.to(device)
+    #     print("netD sent to cuda")
+    #     generator_criterion.to(device)
+    #     print("generator criterion sent to cuda")
 
     if torch.cuda.is_available():
-        netG.to(device)
+        netG.to(device_gen)
         print("netG sent to cuda")
-        netD.to(device)
+        netD.to(device_disc)
         print("netD sent to cuda")
-        generator_criterion.to(device)
+        generator_criterion.to(device_gen)
         print("generator criterion sent to cuda")
 
     optimizerG = optim.Adam(netG.parameters())
@@ -81,17 +91,17 @@ if __name__ == '__main__':
             ###########################
             real_img = Variable(target)
             if torch.cuda.is_available():
-                real_img = real_img.to(device)
+                real_img = real_img.to(device_disc)
             z = Variable(source)
             if torch.cuda.is_available():
-                z = z.to(device)
-            fake_img = netG(z)
+                z = z.to(device_gen)
+            fake_img = netG(z).to(device_disc)
 
             netD.zero_grad()
             real_out = netD(real_img).mean()
             fake_out = netD(fake_img).mean()
             d_loss = 1 - real_out + fake_out
-            d_loss.backward(retain_graph=True)
+            d_loss.backward()
             optimizerD.step()
 
             ############################
@@ -99,13 +109,17 @@ if __name__ == '__main__':
             ###########################
             netG.zero_grad()
             ## The two lines below are added to prevent runetime error in Google Colab ##
-            fake_img = netG(z)
-            fake_out = netD(fake_img).mean()
+#             fake_img = netG(z).detach().to(device_disc)
+            fake_img = netG(z).to(device_disc)
+            fake_out = netD(fake_img).mean().to(device_gen)
+            real_img = real_img.to(device_gen)
+            fake_img = fake_img.to(device_gen)
             ##
             g_loss = generator_criterion(fake_out, fake_img, real_img)
             g_loss.backward()
 
-            fake_img = netG(z)
+#             fake_img = netG(z).detach().to(device_disc)
+            fake_img = netG(z).to(device_disc)
             fake_out = netD(fake_img).mean()
 
             optimizerG.step()
@@ -123,7 +137,7 @@ if __name__ == '__main__':
                 running_results['g_score'] / running_results['batch_sizes']))
 
         netG.eval()
-        out_path = 'training_results/'
+        out_path = '/kaggle/working/training_results/'
         if not os.path.exists(out_path):
             os.makedirs(out_path)
 
@@ -137,8 +151,8 @@ if __name__ == '__main__':
                 lr = val_lr
                 hr = val_hr
                 if torch.cuda.is_available():
-                    lr = lr.to(device)
-                    hr = hr.to(device)
+                    lr = lr.to(device_gen)
+                    hr = hr.to(device_gen)
                 sr = netG(lr)
 
                 batch_mse = ((sr - hr) ** 2).data.mean()
@@ -163,9 +177,11 @@ if __name__ == '__main__':
                 utils.save_image(image, out_path + 'epoch_%d_index_%d.png' % (epoch, index), padding=5)
                 index += 1
 
+        if not os.path.exists('/kaggle/working/epochs/'):
+            os.makedirs('/kaggle/working/epochs/')
         # save model parameters
-        torch.save(netG.state_dict(), 'epochs/netG_epoch_%d_%d.pth' % (4, epoch))
-        torch.save(netD.state_dict(), 'epochs/netD_epoch_%d_%d.pth' % (4, epoch))
+        torch.save(netG.state_dict(), '/kaggle/working/epochs/netG_epoch_%d_%d.pth' % (4, epoch))
+        torch.save(netD.state_dict(), '/kaggle/working/epochs/netD_epoch_%d_%d.pth' % (4, epoch))
         # save loss\scores\psnr\ssim
         results['d_loss'].append(running_results['d_loss'] / running_results['batch_sizes'])
         results['g_loss'].append(running_results['g_loss'] / running_results['batch_sizes'])
@@ -175,7 +191,9 @@ if __name__ == '__main__':
         # results['ssim'].append(validation_results['ssim'])
 
         if epoch % 10 == 0 and epoch != 0:
-            out_path = 'statistics/'
+            out_path = '/kaggle/working/statistics/'
+            if not os.path.exists(out_path):
+                os.makedirs(out_path)
             data_frame = pd.DataFrame(
                 data={'Loss_D': results['d_loss'], 'Loss_G': results['g_loss'], 'Score_D': results['d_score'],
                         'Score_G': results['g_score'], 'PSNR': results['psnr'], 'SSIM': 0},
