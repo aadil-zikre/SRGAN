@@ -161,9 +161,3 @@ cython_debug/
 
 data/*
 !data/*.md
-
-training_results/*
-!training_results/*.md
-
-models/*
-!models/*.md
